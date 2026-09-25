@@ -17,8 +17,24 @@ Requires C++17, CMake >= 3.25.1, CGAL >= 6.0, Eigen3, Boost and the arithmetic
 libraries selected by CGAL (GMP/MPFR in the tested Linux build). Python 3 is used
 for tests. Dependencies are not downloaded automatically.
 
+On Debian 12, the distribution package is CGAL 5.5 and does not satisfy the
+CGAL >= 6.0 requirement. Install the build dependencies and CGAL 6.0 locally:
+
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+sudo apt install build-essential libboost-dev libeigen3-dev libgmp-dev libmpfr-dev
+wget https://github.com/CGAL/cgal/releases/download/v6.0/CGAL-6.0.tar.xz
+tar -xf CGAL-6.0.tar.xz
+cmake -S CGAL-6.0 -B cgal-build -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$HOME/.local"
+cmake --build cgal-build -j2
+cmake --install cgal-build
+```
+
+Then configure this repository by pointing CMake at the installed package:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+    -DCGAL_DIR="$HOME/.local/lib/CGAL"
 cmake --build build -j2
 ctest --test-dir build --output-on-failure
 cmake --install build --prefix "$PWD/install"
