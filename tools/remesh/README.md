@@ -1,8 +1,8 @@
 # mbm-cgal-remesh
 
 Runs CGAL Polygon Mesh Processing isotropic remeshing on a static triangular
-OBJ mesh. It targets a uniform edge length, not a polygon count; the output may
-contain more or fewer triangles than the input.
+OBJ mesh. Choose a uniform edge length or an approximate triangle target;
+the output may contain more or fewer triangles than the input.
 
 ```sh
 mbm-cgal-remesh input.obj output.obj 0.03 3 45 report.txt
@@ -38,3 +38,40 @@ Keep the worker outside the mini-mbm runtime and use it only for static offline
 assets.
 Run its focused test from the repository root with
 `ctest --test-dir build --output-on-failure -R isotropic_remesh`.
+
+## Approximate triangle target
+
+```sh
+mbm-cgal-remesh input.obj output.obj 0.03 3 45 report.txt --target-triangles 3000
+```
+
+The optional trailing flag takes an integer from 2 to 100000. Supply all six
+positional arguments with this flag. The edge fraction remains validated for
+compatibility but does not choose the initial length in target mode.
+The worker measures source surface area A and estimates
+`L = sqrt(4 * A / (sqrt(3) * target))`. It performs at most eight trials,
+each starting from the original geometry, adjusting the length using measured
+triangle counts and a bracket when available. It retains the topology-safe
+candidate closest to the requested count, stopping early within 5%.
+Trial lengths have a lower bound based on a 200000-triangle area estimate and
+an upper bound of twice the input diagonal; these are search bounds, not hard
+memory or output-count limits. Existing import vertex limits still apply.
+
+This is a heuristic, not an exact count or a proof of optimality. Constraints
+and discrete changes in triangulation may prevent convergence even for simple
+meshes. No constraints are relaxed to force a match. No QEM pass is added.
+A valid result outside tolerance exits 0 with `target_reached=0`; no valid
+candidate fails without applying geometry. Check the report instead of assuming
+that process success means the budget was met.
+
+Additional report fields: `target_triangles` (0 for length mode),
+`target_relative_error`, `target_reached` (0/1), `target_tolerance` (0.05),
+`search_attempts`, and `surface_area`. Result counts use live vertices/faces,
+excluding removed Surface_mesh storage slots.
+
+All three editors expose a target checkbox and fixed-width integer field;
+length mode remains the default for existing projects. Reports show requested
+and achieved counts, the percentage difference, and a warning outside 5%.
+Mesh Debug distributes a selected-subset total proportionally to source triangle
+counts with at least two triangles per selected subset. Image Mesh applies the
+target per generated region; mesh3dgen applies it to the selected local asset.

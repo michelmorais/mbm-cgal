@@ -48,6 +48,29 @@ def main():
         assert "mtllib " in result and "usemtl surface" in result
         assert "vt " in result and "f " in result
 
+        # Count targets: up, down, and an unattainable budget. Reports must
+        # count live faces, not Surface_mesh storage slots after collapses.
+        before = source.read_bytes()
+        for target in (16, 500, 2):
+            target_output, target_report = root/f'target-{target}.obj', root/f'target-{target}.txt'
+            run = subprocess.run([str(executable), str(source), str(target_output), '.03', '3', '45',
+                                  str(target_report), '--target-triangles', str(target)], capture_output=True, text=True)
+            assert run.returncode == 0, run.stderr
+            fields = dict(part.split('=') for part in target_report.read_text().split()[1:])
+            actual = sum(line.startswith('f ') for line in target_output.read_text().splitlines())
+            assert int(fields['result_triangles']) == actual
+            assert int(fields['target_triangles']) == target
+            assert math.isclose(float(fields['target_relative_error']), abs(actual-target)/target)
+            assert 1 <= int(fields['search_attempts']) <= 8
+            assert source.read_bytes() == before
+            if target == 2: assert fields['target_reached'] == '0'
+            else: assert fields['target_reached'] == '1'
+        for bad in ('0','1','-1','1.5','nan','inf','100001'):
+            run = subprocess.run([str(executable), str(source), str(root/'bad.obj'), '.03','3','45',
+                                  str(root/'bad.txt'),'--target-triangles',bad], capture_output=True)
+            assert run.returncode != 0 and not (root/'bad.obj').exists()
+            (root/'bad.txt').unlink(missing_ok=True)
+
         # Exercise refinement (including newly created faces), chart propagation,
         # UV seams, material preservation and open-boundary topology.
         make_grid(source, charts=True)

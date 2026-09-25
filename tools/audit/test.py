@@ -31,6 +31,14 @@ with tempfile.TemporaryDirectory(prefix='mbm-audit-') as tmp:
     assert math.isclose(r['minimum_angle_degrees'], 45)
     assert math.isclose(r['triangle_quality_mean'], math.sqrt(3)/2)
     assert math.isclose(r['diagonal'], math.sqrt(2))
+    quiet_report = root / 'quiet.json'
+    result = subprocess.run([EXE, str(root/'square.obj'), '--report', str(quiet_report), '--quiet'], capture_output=True)
+    assert result.returncode == 0 and not result.stdout and not result.stderr
+    assert json.loads(quiet_report.read_text()) == r
+    failed_report = root / 'quiet-failed.json'
+    result = subprocess.run([EXE, str(root/'missing.obj'), '--report', str(failed_report), '--quiet'], capture_output=True)
+    assert result.returncode == 1 and not result.stdout and not result.stderr
+    assert json.loads(failed_report.read_text())['status'] == 'failed'
     original = output.read_bytes()
     result = subprocess.run([EXE, str(root/'square.obj'), '--report', str(output)], capture_output=True)
     assert result.returncode == 1 and output.read_bytes() == original

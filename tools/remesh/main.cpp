@@ -31,6 +31,7 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -229,9 +230,9 @@ static void writeObj(const std::string &path, const MESH &mesh,
 
 int main(int argc, char **argv)
 {
-    if (argc < 4 || argc > 7)
+    if (argc < 4 || (argc > 7 && argc != 9))
     {
-        std::cerr << "Usage: mbm-cgal-remesh input.obj output.obj edge-length-fraction [iterations [feature-angle-deg [report-path]]]\n";
+        std::cerr << "Usage: mbm-cgal-remesh input.obj output.obj edge-length-fraction [iterations [feature-angle-deg [report-path]]] [--target-triangles count]\n";
         return 2;
     }
     std::ofstream reportFile;
@@ -244,7 +245,7 @@ int main(int argc, char **argv)
             return result;
         };
         if (std::filesystem::exists(argv[2])) throw std::runtime_error("output already exists; choose a new file");
-        if (argc == 7)
+        if (argc >= 7)
         {
             if (std::filesystem::exists(argv[6])) throw std::runtime_error("report already exists");
             reportFile.open(argv[6]);
@@ -253,6 +254,15 @@ int main(int argc, char **argv)
         if (std::filesystem::path(argv[1]).extension() != ".obj" ||
             std::filesystem::path(argv[2]).extension() != ".obj")
             throw std::runtime_error("input and output must be .obj files");
+        std::size_t targetTriangles = 0;
+        if (argc == 9)
+        {
+            const double target = number(argv[8]);
+            if (std::string(argv[7]) != "--target-triangles" || !std::isfinite(target) ||
+                target < 2 || target > 100000 || std::floor(target) != target)
+                throw std::runtime_error("target triangles range: integer 2..100000");
+            targetTriangles = static_cast<std::size_t>(target);
+        }
         const double fraction = number(argv[3]);
         const double rawIterations = argc >= 5 ? number(argv[4]) : 3;
         if (!std::isfinite(rawIterations) || rawIterations < 1 || rawIterations > 10 ||
@@ -276,28 +286,65 @@ int main(int argc, char **argv)
         const double boundsDiagonal = diagonal(source);
         if (!std::isfinite(boundsDiagonal) || boundsDiagonal <= 0)
             throw std::runtime_error("invalid input bounds");
-        const double targetEdgeLength = fraction * boundsDiagonal;
+        double targetEdgeLength = fraction * boundsDiagonal;
         const auto begin = std::chrono::steady_clock::now();
 
         auto chartMap = source.add_property_map<FACE, std::size_t>("f:mbm_chart", std::size_t(-1)).first;
         auto constraints = source.add_property_map<EDGE, bool>("e:mbm_constraint", false).first;
         const auto chartCount = labelCharts(source, input, chartMap, constraints, featureAngle);
 
-        MESH result = source;
-        const auto resultChartsProperty = result.property_map<FACE, std::size_t>("f:mbm_chart");
-        const auto resultConstraintsProperty = result.property_map<EDGE, bool>("e:mbm_constraint");
-        if (!resultChartsProperty || !resultConstraintsProperty)
-            throw std::runtime_error("remeshing property maps are missing");
-        const auto resultCharts = *resultChartsProperty;
-        const auto resultConstraints = *resultConstraintsProperty;
-        PMP::isotropic_remeshing(faces(result), targetEdgeLength, result,
-            CGAL::parameters::number_of_iterations(iterations)
-                .edge_is_constrained_map(resultConstraints)
-                .face_patch_map(resultCharts)
-                .collapse_constraints(false)
-                .do_project(true));
-        if (result.is_empty() || !CGAL::is_triangle_mesh(result) || !CGAL::is_valid_polygon_mesh(result))
-            throw std::runtime_error("invalid remeshing result");
+        const auto sourceAudit = mbm_cgal_audit::topology(source);
+        double surfaceArea = 0;
+        for (FACE face : source.faces())
+        {
+            const auto h = source.halfedge(face);
+            surfaceArea += std::sqrt(CGAL::to_double(CGAL::squared_area(
+                source.point(source.source(h)), source.point(source.target(h)),
+                source.point(source.target(source.next(h))))));
+        }
+        if (!std::isfinite(surfaceArea) || surfaceArea <= 0) throw std::runtime_error("invalid surface area");
+        // Equilateral triangles: A = N * sqrt(3) / 4 * L^2.
+        const double minLength = std::sqrt(4 * surfaceArea / (std::sqrt(3.) * 200000.));
+        double trialLength = targetTriangles ? std::sqrt(4 * surfaceArea / (std::sqrt(3.) * targetTriangles)) : targetEdgeLength;
+        MESH result;
+        double bestError = std::numeric_limits<double>::infinity();
+        double lower = 0, upper = 0;
+        unsigned attempts = 0;
+        for (unsigned attempt = 0; attempt < (targetTriangles ? 8u : 1u); ++attempt)
+        {
+            ++attempts;
+            MESH candidate = source;
+            auto charts = *candidate.property_map<FACE, std::size_t>("f:mbm_chart");
+            auto constrained = *candidate.property_map<EDGE, bool>("e:mbm_constraint");
+            PMP::isotropic_remeshing(faces(candidate), trialLength, candidate,
+                CGAL::parameters::number_of_iterations(iterations)
+                    .edge_is_constrained_map(constrained).face_patch_map(charts)
+                    .collapse_constraints(false).do_project(true));
+            if (candidate.is_empty() || !CGAL::is_triangle_mesh(candidate) || !CGAL::is_valid_polygon_mesh(candidate))
+                throw std::runtime_error("invalid remeshing result");
+            const double count = candidate.number_of_faces();
+            bool valid = true;
+            if (targetTriangles)
+            {
+                const auto audit = mbm_cgal_audit::topology(candidate);
+                valid = !(audit.selfIntersects && !sourceAudit.selfIntersects) &&
+                    audit.components == sourceAudit.components && audit.closed == sourceAudit.closed;
+            }
+            const double error = targetTriangles ? std::abs(count - targetTriangles) / targetTriangles : 0;
+            if (valid && error < bestError)
+            {
+                result = std::move(candidate); bestError = error; targetEdgeLength = trialLength;
+            }
+            if (!targetTriangles || (valid && error <= .05)) break;
+            if (count > targetTriangles) lower = trialLength; else upper = trialLength;
+            double next = lower > 0 && upper > 0 ? std::sqrt(lower * upper) :
+                trialLength * std::clamp(std::sqrt(count / targetTriangles), .5, 2.);
+            next = std::clamp(next, minLength, std::max(minLength, boundsDiagonal * 2));
+            if (std::abs(next - trialLength) < trialLength * .001) break;
+            trialLength = next;
+        }
+        if (result.is_empty()) throw std::runtime_error("no topology-safe candidate for triangle target");
+        const auto resultCharts = *result.property_map<FACE, std::size_t>("f:mbm_chart");
 
         std::vector<std::vector<FACE>> chartFaces(chartCount);
         std::vector<std::string> materials(chartCount);
@@ -322,7 +369,6 @@ int main(int argc, char **argv)
             trees.push_back(std::move(tree));
         }
 
-        const auto sourceAudit = mbm_cgal_audit::topology(source);
         const auto resultAudit = mbm_cgal_audit::topology(result);
         const bool sourceIntersects = sourceAudit.selfIntersects, resultIntersects = resultAudit.selfIntersects;
         const auto sourceComponents = sourceAudit.components, resultComponents = resultAudit.components;
@@ -334,9 +380,14 @@ int main(int argc, char **argv)
         report << std::setprecision(17)
                << "CGAL_REMESH_RESULT source_vertices=" << num_vertices(source)
                << " source_triangles=" << num_faces(source)
-               << " result_vertices=" << num_vertices(result)
-               << " result_triangles=" << num_faces(result)
+               << " result_vertices=" << result.number_of_vertices()
+               << " result_triangles=" << result.number_of_faces()
                << " target_edge_length=" << targetEdgeLength
+               << " target_triangles=" << targetTriangles
+               << " target_relative_error=" << (targetTriangles ? bestError : 0)
+               << " target_reached=" << (targetTriangles && bestError <= .05)
+               << " target_tolerance=" << .05 << " search_attempts=" << attempts
+               << " surface_area=" << surfaceArea
                << " charts=" << chartCount << " iterations=" << iterations
                << " source_closed=" << sourceClosed << " result_closed=" << resultClosed
                << " source_self_intersections=" << sourceIntersects
