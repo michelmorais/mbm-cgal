@@ -9,7 +9,8 @@ mbm-cgal-audit input.off --report new-report.json
 mbm-cgal-audit input.obj --report new-report.json --skip-self-intersections
 ```
 
-The worker always writes the completed JSON to stdout. `--report` also writes a
+By default the worker writes the completed JSON to stdout. `--quiet` suppresses
+stdout/stderr JSON while preserving `--report` and the exit code. `--report` also writes a
 new file; existing files are refused. Exit `0` means analysis completed, **not**
 that the mesh has no defects. Exit `1` means an argument, input, numeric-range or
 I/O failure. Failures use JSON on stderr and, when the new report path was

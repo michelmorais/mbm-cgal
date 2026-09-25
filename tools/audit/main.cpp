@@ -183,14 +183,16 @@ int main(int argc,char **argv)
 {
     std::string reportPath;
     bool canWriteReport=false;
+    bool quiet=false;
     try
     {
-        if (argc<2) throw std::runtime_error("usage: mbm-cgal-audit input.obj|input.off [--report new.json] [--skip-self-intersections]");
+        if (argc<2) throw std::runtime_error("usage: mbm-cgal-audit input.obj|input.off [--report new.json] [--skip-self-intersections] [--quiet]");
         bool intersections=true;
         for (int i=2;i<argc;++i)
         {
             const std::string arg=argv[i];
-            if (arg=="--skip-self-intersections") intersections=false;
+            if (arg=="--quiet") quiet=true;
+            else if (arg=="--skip-self-intersections") intersections=false;
             else if (arg=="--report" && i+1<argc && reportPath.empty()) reportPath=argv[++i];
             else throw std::runtime_error("invalid arguments");
         }
@@ -208,7 +210,7 @@ int main(int argc,char **argv)
             if (!file || !(file<<result)) throw std::runtime_error("cannot write report");
             file.close(); if (!file) throw std::runtime_error("cannot close report");
         }
-        std::cout<<result;
+        if (!quiet) std::cout<<result;
         return 0;
     }
     catch (const std::exception &error)
@@ -216,6 +218,7 @@ int main(int argc,char **argv)
         REPORT r; r.number("schema_version",1); r.text("operation","mesh_audit"); r.text("status","failed"); r.text("error",error.what());
         const auto json=r.finish();
         if (canWriteReport) { std::ofstream file(reportPath,std::ios::binary); if (file) file<<json; }
-        std::cerr<<json; return 1;
+        if (!quiet) std::cerr<<json;
+        return 1;
     }
 }
