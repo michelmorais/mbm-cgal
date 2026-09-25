@@ -77,6 +77,16 @@ contains standalone geometry, UV and protocol tests.
 
 The following are proposals, not implemented tools or engine features:
 
+- **Isotropic remeshing (recommended next prototype):** add a separate offline
+  worker to regularize triangle size and distribution toward a target edge
+  length. This is a strong shared candidate for mini-mbm and mesh3dgen: it could
+  provide a local, no-provider-call alternative when the need is uniform
+  triangular tessellation, while retaining the source asset. It is not a
+  polygon-count target and may add triangles. Start with static OBJ meshes,
+  preserve material and UV-chart boundaries, and report geometric deviation,
+  triangle quality, counts and topology checks. This is not a drop-in replacement
+  for AI retopology when quad layout, semantic edge flow or texture baking is
+  required.
 - **Mesh audit:** add a read-only diagnostic tool for degenerate geometry,
   boundaries, connected components and self-intersections. Consider repair only
   as a later, explicit operation that writes a separate result.
@@ -88,13 +98,6 @@ The following are proposals, not implemented tools or engine features:
   backend against the engine's existing constrained and relief-aware
   triangulation. Adopt it only if representative assets show a measurable
   quality or performance improvement.
-- **Isotropic remeshing:** evaluate a separate operation to regularize triangle
-  sizes and distribution toward a target edge length. Unlike the current
-  almost-planar patch reduction, this is not inherently a polygon-count
-  reduction and may add triangles. A useful tool would need explicit constraints
-  for boundaries and sharp features, plus a strategy for preserving UV seams and
-  material regions; validate geometric deviation and output counts on real
-  assets.
 
 The engine's QEM simplifier already handles engine-specific attributes and
 deformation data, so replacing it with a generic CGAL simplifier is not a goal.
