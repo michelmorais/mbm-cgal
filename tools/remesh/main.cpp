@@ -36,6 +36,7 @@
 #include <string>
 #include <vector>
 #include "../planar/uv-transfer.h"
+#include "../common/mesh-audit.h"
 
 namespace PMP = CGAL::Polygon_mesh_processing;
 using KERNEL = CGAL::Exact_predicates_inexact_constructions_kernel;
@@ -123,12 +124,6 @@ static double diagonal(const MESH &mesh)
     const double y = bounds.ymax() - bounds.ymin();
     const double z = bounds.zmax() - bounds.zmin();
     return std::sqrt(x*x + y*y + z*z);
-}
-
-static std::size_t components(MESH &mesh)
-{
-    auto map = mesh.add_property_map<FACE, std::size_t>("f:component", 0).first;
-    return PMP::connected_components(mesh, map);
 }
 
 static double sampledDistance(const MESH &source, const MESH &target)
@@ -327,12 +322,11 @@ int main(int argc, char **argv)
             trees.push_back(std::move(tree));
         }
 
-        const bool sourceIntersects = PMP::does_self_intersect(source);
-        const bool resultIntersects = PMP::does_self_intersect(result);
-        auto sourceCopy = source;
-        auto resultCopy = result;
-        const auto sourceComponents = components(sourceCopy), resultComponents = components(resultCopy);
-        const bool sourceClosed = CGAL::is_closed(source), resultClosed = CGAL::is_closed(result);
+        const auto sourceAudit = mbm_cgal_audit::topology(source);
+        const auto resultAudit = mbm_cgal_audit::topology(result);
+        const bool sourceIntersects = sourceAudit.selfIntersects, resultIntersects = resultAudit.selfIntersects;
+        const auto sourceComponents = sourceAudit.components, resultComponents = resultAudit.components;
+        const bool sourceClosed = sourceAudit.closed, resultClosed = resultAudit.closed;
         const double sampledError = std::max(sampledDistance(source, result), sampledDistance(result, source));
         writeObj(argv[2], result, input, resultCharts, materials, trees, source);
 

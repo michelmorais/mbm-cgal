@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+find_package(CGAL 6.0 REQUIRED)
+add_executable(mbm-cgal-audit main.cpp)
+target_compile_features(mbm-cgal-audit PRIVATE cxx_std_17)
+target_link_libraries(mbm-cgal-audit PRIVATE CGAL::CGAL)
+install(TARGETS mbm-cgal-audit RUNTIME DESTINATION bin)
+if(BUILD_TESTING)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME mesh_audit COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test.py $<TARGET_FILE:mbm-cgal-audit>)
+endif()

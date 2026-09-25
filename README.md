@@ -11,6 +11,9 @@ linked into the mini-mbm engine.
 - [mbm-cgal-remesh](tools/remesh/README.md): isotropic remeshing of static
   triangular OBJ meshes, with UV/material chart and sharp-feature constraints.
 
+- [mbm-cgal-audit](tools/audit/README.md): read-only OBJ/OFF geometry diagnostics
+  with a versioned JSON API, also exposed through Lua and the three editors.
+
 Additional tools belong in `tools/<name>/` with their own targets and tests.
 
 ## Build and test
@@ -60,7 +63,7 @@ Installed executables are placed in `install/bin/`; licenses are installed under
 ## Use from mini-mbm
 
 In Mesh Debug or Image Mesh Editor, configure the full paths to
-`mbm-cgal-planar` and `mbm-cgal-remesh` (or their `.exe` files) under
+`mbm-cgal-planar`, `mbm-cgal-remesh` and `mbm-cgal-audit` (or their `.exe` files) under
 **Options > CGAL executable** and save them. Their locations can change without
 rebuilding the engine.
 
@@ -84,9 +87,8 @@ contains standalone geometry, UV and protocol tests.
 
 The following are proposals, not implemented tools or engine features:
 
-- **Mesh audit:** add a read-only diagnostic tool for degenerate geometry,
-  boundaries, connected components and self-intersections. Consider repair only
-  as a later, explicit operation that writes a separate result.
+- **Mesh repair:** build on the read-only Audit diagnostics as a later, explicit
+  operation that writes a separate result.
 - **Collision proxies:** evaluate offline convex-hull or convex-decomposition
   generation for Bullet, with editor preview and an asset-format path. The
   expected benefit is cheaper collision geometry; prioritize this if 3D mesh
