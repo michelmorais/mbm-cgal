@@ -57,13 +57,42 @@ Installed executables are placed in `install/bin/`; licenses are installed under
 
 ## Use from mini-mbm
 
-In Mesh Debug or Image Mesh Editor, open **Options > CGAL executable**, choose the
-full path to `mbm-cgal-planar` (or `mbm-cgal-planar.exe`) and **Save path**.
-Select **Coplanar (CGAL external)** in general simplification. The executable's
-location can change without rebuilding the engine. The editors retain their
-preview, cancellation, UV/material transfer and undo/history responsibilities.
+In Mesh Debug or Image Mesh Editor, configure the full path to
+`mbm-cgal-planar` (or `mbm-cgal-planar.exe`) under **Options > CGAL executable**
+and save it. The executable's location can change without rebuilding the engine.
+
+The mini-mbm editors currently expose the planar worker as `cgal`; their
+`cgal_qem` mode can follow planar reduction with the engine's own QEM pass when
+needed to meet the requested triangle budget. The worker is also available to
+the static image-mesh build workflow. These are client-side integrations: this
+repository builds only the standalone planar executable, and CGAL is not linked
+into the engine. The editors retain preview, cancellation, attribute transfer
+and undo/history responsibilities. The worker does not transfer skin weights or
+animation; Mesh Debug's CGAL workflow is restricted to static meshes.
+
 Engine/editor integration tests live in the mini-mbm repository; this repository
 contains standalone geometry, UV and protocol tests.
+
+## Future work
+
+The following are proposals, not implemented tools or engine features:
+
+- **Mesh audit:** add a read-only diagnostic tool for degenerate geometry,
+  boundaries, connected components and self-intersections. Consider repair only
+  as a later, explicit operation that writes a separate result.
+- **Collision proxies:** evaluate offline convex-hull or convex-decomposition
+  generation for Bullet, with editor preview and an asset-format path. The
+  expected benefit is cheaper collision geometry; prioritize this if 3D mesh
+  collision is an active engine use case.
+- **Image-mesh triangulation:** benchmark a CGAL constrained-triangulation
+  backend against the engine's existing constrained and relief-aware
+  triangulation. Adopt it only if representative assets show a measurable
+  quality or performance improvement.
+
+The engine's QEM simplifier already handles engine-specific attributes and
+deformation data, so replacing it with a generic CGAL simplifier is not a goal.
+Keep CGAL as an optional offline/editor tool; assess licensing before bundling
+its executable with engine distributions.
 
 ## License
 
