@@ -88,6 +88,13 @@ The following are proposals, not implemented tools or engine features:
   backend against the engine's existing constrained and relief-aware
   triangulation. Adopt it only if representative assets show a measurable
   quality or performance improvement.
+- **Isotropic remeshing:** evaluate a separate operation to regularize triangle
+  sizes and distribution toward a target edge length. Unlike the current
+  almost-planar patch reduction, this is not inherently a polygon-count
+  reduction and may add triangles. A useful tool would need explicit constraints
+  for boundaries and sharp features, plus a strategy for preserving UV seams and
+  material regions; validate geometric deviation and output counts on real
+  assets.
 
 The engine's QEM simplifier already handles engine-specific attributes and
 deformation data, so replacing it with a generic CGAL simplifier is not a goal.
