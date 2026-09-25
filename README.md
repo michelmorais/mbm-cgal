@@ -18,23 +18,33 @@ libraries selected by CGAL (GMP/MPFR in the tested Linux build). Python 3 is use
 for tests. Dependencies are not downloaded automatically.
 
 On Debian 12, the distribution package is CGAL 5.5 and does not satisfy the
-CGAL >= 6.0 requirement. Install the build dependencies and CGAL 6.0 locally:
+CGAL >= 6.0 requirement. Install the build dependencies and CGAL 6.0 system-wide:
 
 ```sh
 sudo apt install build-essential libboost-dev libeigen3-dev libgmp-dev libmpfr-dev
-wget https://github.com/CGAL/cgal/releases/download/v6.0/CGAL-6.0.tar.xz
-tar -xf CGAL-6.0.tar.xz
-cmake -S CGAL-6.0 -B cgal-build -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX="$HOME/.local"
-cmake --build cgal-build -j2
-cmake --install cgal-build
+wget -O /tmp/CGAL-6.0.tar.xz \
+    https://github.com/CGAL/cgal/releases/download/v6.0/CGAL-6.0.tar.xz
+mkdir -p "$HOME/src"
+tar -xf /tmp/CGAL-6.0.tar.xz -C "$HOME/src"
+cmake -S "$HOME/src/CGAL-6.0" -B /tmp/cgal-6.0-build \
+    -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local
+cmake --build /tmp/cgal-6.0-build -j2
+sudo cmake --install /tmp/cgal-6.0-build
+```
+
+After a successful install, the source archive and build directory are no
+longer needed and can be removed. Keep `/usr/local`, which contains the
+system-wide CGAL installation:
+
+```sh
+rm -rf "$HOME/src/CGAL-6.0" /tmp/cgal-6.0-build /tmp/CGAL-6.0.tar.xz
 ```
 
 Then configure this repository by pointing CMake at the installed package:
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
-    -DCGAL_DIR="$HOME/.local/lib/CGAL"
+    -DCGAL_DIR=/usr/local/lib/CGAL
 cmake --build build -j2
 ctest --test-dir build --output-on-failure
 cmake --install build --prefix "$PWD/install"
