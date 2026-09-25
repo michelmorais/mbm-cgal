@@ -8,6 +8,8 @@ linked into the mini-mbm engine.
 
 - [mbm-cgal-planar](tools/planar/README.md): planar/almost-planar mesh reduction,
   with OBJ corner UVs and material boundaries or geometry-only OFF input.
+- [mbm-cgal-remesh](tools/remesh/README.md): isotropic remeshing of static
+  triangular OBJ meshes, with UV/material chart and sharp-feature constraints.
 
 Additional tools belong in `tools/<name>/` with their own targets and tests.
 
@@ -57,18 +59,23 @@ Installed executables are placed in `install/bin/`; licenses are installed under
 
 ## Use from mini-mbm
 
-In Mesh Debug or Image Mesh Editor, configure the full path to
-`mbm-cgal-planar` (or `mbm-cgal-planar.exe`) under **Options > CGAL executable**
-and save it. The executable's location can change without rebuilding the engine.
+In Mesh Debug or Image Mesh Editor, configure the full paths to
+`mbm-cgal-planar` and `mbm-cgal-remesh` (or their `.exe` files) under
+**Options > CGAL executable** and save them. Their locations can change without
+rebuilding the engine.
 
-The mini-mbm editors currently expose the planar worker as `cgal`; their
-`cgal_qem` mode can follow planar reduction with the engine's own QEM pass when
-needed to meet the requested triangle budget. The worker is also available to
-the static image-mesh build workflow. These are client-side integrations: this
-repository builds only the standalone planar executable, and CGAL is not linked
-into the engine. The editors retain preview, cancellation, attribute transfer
-and undo/history responsibilities. The worker does not transfer skin weights or
-animation; Mesh Debug's CGAL workflow is restricted to static meshes.
+The mini-mbm editors expose planar reduction as `cgal`; `cgal_qem` can follow
+that pass with the engine's QEM when needed to meet a triangle budget. Isotropic
+remeshing is a separate **Remesh** operation, not a reduction mode, and may
+increase triangle count. Both workers run offline; CGAL is not linked into the
+engine. The editors retain preview, cancellation, attribute transfer and
+undo/history responsibilities. The CLI OBJ format has no physics data; editor
+adapters copy authored collision shapes when rebuilding the MSH. Remesh requires
+static triangle meshes and does not transfer skin weights or animation.
+
+The Image Mesh Editor can run Remesh after optional simplification as a separate
+stage. The mesh3dgen editor also uses the standalone worker for a local MSH
+variant; this does not submit or replace its paid remote Remesh task.
 
 Engine/editor integration tests live in the mini-mbm repository; this repository
 contains standalone geometry, UV and protocol tests.
@@ -77,16 +84,6 @@ contains standalone geometry, UV and protocol tests.
 
 The following are proposals, not implemented tools or engine features:
 
-- **Isotropic remeshing (recommended next prototype):** add a separate offline
-  worker to regularize triangle size and distribution toward a target edge
-  length. This is a strong shared candidate for mini-mbm and mesh3dgen: it could
-  provide a local, no-provider-call alternative when the need is uniform
-  triangular tessellation, while retaining the source asset. It is not a
-  polygon-count target and may add triangles. Start with static OBJ meshes,
-  preserve material and UV-chart boundaries, and report geometric deviation,
-  triangle quality, counts and topology checks. This is not a drop-in replacement
-  for AI retopology when quad layout, semantic edge flow or texture baking is
-  required.
 - **Mesh audit:** add a read-only diagnostic tool for degenerate geometry,
   boundaries, connected components and self-intersections. Consider repair only
   as a later, explicit operation that writes a separate result.
