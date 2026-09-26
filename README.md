@@ -55,6 +55,58 @@ ctest --test-dir build --output-on-failure
 cmake --install build --prefix "$PWD/install"
 ```
 
+### Windows
+
+The supported Windows build uses MSVC, CMake and vcpkg. Install the **Desktop
+development with C++** workload from Visual Studio, including MSVC v143 and a
+Windows SDK. Then install vcpkg and the native dependencies from a vcpkg
+enabled developer prompt. If `vcpkg` is not recognized, install it first:
+
+```powershell
+New-Item -ItemType Directory -Force C:\src | Out-Null
+git clone https://github.com/microsoft/vcpkg.git C:\src\vcpkg
+& C:\src\vcpkg\bootstrap-vcpkg.bat
+& C:\src\vcpkg\vcpkg.exe install cgal eigen3 boost gmp mpfr --triplet x64-windows
+```
+
+CGAL 6.0 or newer is required. Check the installed version if vcpkg selects an
+older port before configuring this repository. The first configuration can
+build only the audit worker, which is a useful way to validate the toolchain:
+
+```powershell
+cmake -S . -B build-win `
+  -G "Visual Studio 17 2022" `
+  -A x64 `
+  -DCMAKE_TOOLCHAIN_FILE=C:/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake `
+  -DMBM_CGAL_BUILD_PLANAR=OFF `
+  -DMBM_CGAL_BUILD_REMESH=OFF `
+  -DMBM_CGAL_BUILD_AUDIT=ON
+
+cmake --build build-win --config Release
+ctest --test-dir build-win -C Release --output-on-failure
+```
+
+After the audit worker passes, configure and build all workers:
+
+```powershell
+cmake -S . -B build-win `
+  -G "Visual Studio 17 2022" `
+  -A x64 `
+  -DCMAKE_TOOLCHAIN_FILE=C:/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+cmake --build build-win --config Release
+ctest --test-dir build-win -C Release --output-on-failure
+cmake --install build-win --config Release --prefix install-win
+```
+
+The resulting executables have the `.exe` suffix. With this generator, the
+build-tree binaries are under `build-win/tools/<tool>/Release/`; installed
+binaries are under `install-win/bin/`. The Python tests require Python 3 to be
+available on `PATH`.
+
+For a reproducible Windows setup and troubleshooting notes, see
+[docs/windows-build.md](docs/windows-build.md).
+
 For custom dependencies, supply `CGAL_DIR`, `CMAKE_PREFIX_PATH` and the appropriate
 package include/library paths. Use `-DBUILD_TESTING=OFF` to build without Python.
 Installed executables are placed in `install/bin/`; licenses are installed under

@@ -15,5 +15,21 @@ option(MBM_CGAL_BUILD_AUDIT "Build the read-only mesh audit tool" ON)
 if(MBM_CGAL_BUILD_AUDIT)
     add_subdirectory(tools/audit)
 endif()
+if(WIN32)
+    # vcpkg's MSBuild integration copies this runtime DLL beside the build
+    # executable, but CMake's install rules do not know about that copy step.
+    # Install only this third-party DLL; Windows system and MSVC runtime DLLs
+    # must be provided by the target machine or the Visual C++ Redistributable.
+    find_file(MBM_CGAL_GMP_DLL
+        NAMES gmp-10.dll
+        PATHS
+            "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}"
+            ${CMAKE_PREFIX_PATH}
+        PATH_SUFFIXES bin
+        NO_DEFAULT_PATH)
+    if(MBM_CGAL_GMP_DLL)
+        install(FILES "${MBM_CGAL_GMP_DLL}" DESTINATION bin)
+    endif()
+endif()
 install(FILES LICENSE NOTICE.md THIRD_PARTY.md DESTINATION share/mbm-cgal)
 install(DIRECTORY LICENSES DESTINATION share/mbm-cgal)
