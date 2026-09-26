@@ -64,7 +64,7 @@ inline std::size_t index(const std::string &token, std::size_t count)
         throw std::runtime_error("OBJ index out of range");
     return static_cast<std::size_t>(resolved);
 }
-inline INPUT read(const std::string &path, MESH &mesh, bool deferFaces = false)
+inline INPUT read(const std::string &path, MESH &mesh, bool deferFaces = false, bool weldPositions = true)
 {
     std::ifstream file(path);
     if (!file) throw std::runtime_error("cannot open OBJ");
@@ -87,6 +87,11 @@ inline INPUT read(const std::string &path, MESH &mesh, bool deferFaces = false)
             if (tag == "vn") { ++normalCount; continue; }
             std::string extra;
             if (stream >> extra) throw std::runtime_error("OBJ homogeneous/color vertices are not supported");
+            if (!weldPositions)
+            {
+                vertices.push_back(mesh.add_vertex(KERNEL::Point_3(x,y,z)));
+                continue;
+            }
             const POSITION key{x, y, z};
             auto found = welded.find(key);
             if (found == welded.end()) found = welded.emplace(key, mesh.add_vertex(KERNEL::Point_3(x,y,z))).first;

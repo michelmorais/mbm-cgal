@@ -5,12 +5,12 @@ OBJ mesh. Choose a uniform edge length or an approximate triangle target;
 the output may contain more or fewer triangles than the input.
 
 ```sh
-mbm-cgal-remesh input.obj output.obj 0.03 3 45 report.txt
+mbm-cgal-remesh input.obj output.obj 0.03 10 14.5 report.txt
 ```
 
 Arguments: input OBJ, new output OBJ, target edge length as a fraction of the
-input bounding-box diagonal (greater than 0 and at most 0.25), iterations (1..10,
-default `3`), sharp-feature angle in degrees (0..180, default `45`), and an
+input bounding-box diagonal (greater than 0 and at most 0.25), iterations (1..50,
+default `10`), sharp-feature angle in degrees (0..180, default `14.5`), and an
 optional new report path. Existing outputs and reports are refused.
 
 Without repair enabled, input must be an oriented manifold triangle mesh with a UV on every face
@@ -43,7 +43,7 @@ Run its focused test from the repository root with
 ## Approximate triangle target
 
 ```sh
-mbm-cgal-remesh input.obj output.obj 0.03 3 45 report.txt --target-triangles 3000
+mbm-cgal-remesh input.obj output.obj 0.03 10 14.5 report.txt --target-triangles 3000
 ```
 
 The optional trailing flag takes an integer from 2 to 100000. Supply all six
@@ -80,7 +80,7 @@ target per generated region; mesh3dgen applies it to the selected local asset.
 ## Optional topology repair
 
 ```sh
-mbm-cgal-remesh input.obj output.obj 0.03 3 45 report.txt --target-triangles 20000 --repair-topology
+mbm-cgal-remesh input.obj output.obj 0.03 10 14.5 report.txt --target-triangles 20000 --repair-topology
 ```
 
 `--repair-topology` is opt-in and requires all six positional arguments. It can
@@ -95,4 +95,11 @@ seams or separate components, and existing self-intersections may remain.
 result fields. Source topology metrics and all subsequent topology comparisons
 refer to the **repaired** source, not the original invalid soup. Output vertex
 indices encode the splits: consumers must not weld coincident output vertices
-back together when importing. The planar worker retains its strict input policy.
+back together when importing. The planar worker supports the same explicit repair flag.
+
+`--preserve-topology` skips exact-position welding and respects OBJ vertex
+indices. Use it for output from `mbm-cgal-repair`; otherwise welding can undo
+its splits. Supply all six positional arguments before flags. Mesh validity
+checks still apply. GUI defaults enable repair and target count; CLI flags stay
+explicit. Ten passes are the default, up to fifty are accepted. More passes do
+not guarantee improved detail preservation or a reachable triangle target.

@@ -15,6 +15,10 @@ option(MBM_CGAL_BUILD_AUDIT "Build the read-only mesh audit tool" ON)
 if(MBM_CGAL_BUILD_AUDIT)
     add_subdirectory(tools/audit)
 endif()
+option(MBM_CGAL_BUILD_REPAIR "Build the standalone manifold topology repair tool" ON)
+if(MBM_CGAL_BUILD_REPAIR)
+    add_subdirectory(tools/repair)
+endif()
 if(WIN32)
     # vcpkg's MSBuild integration copies this runtime DLL beside the build
     # executable, but CMake's install rules do not know about that copy step.

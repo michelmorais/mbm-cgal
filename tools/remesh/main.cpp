@@ -38,7 +38,7 @@
 #include <vector>
 #include "../planar/uv-transfer.h"
 #include "../common/mesh-audit.h"
-#include "repair-input.h"
+#include "../common/repair-input.h"
 
 namespace PMP = CGAL::Polygon_mesh_processing;
 using KERNEL = CGAL::Exact_predicates_inexact_constructions_kernel;
@@ -233,7 +233,7 @@ int main(int argc, char **argv)
 {
     if (argc < 4)
     {
-        std::cerr << "Usage: mbm-cgal-remesh input.obj output.obj edge-length-fraction [iterations [feature-angle-deg [report-path]]] [--target-triangles count] [--repair-topology]\n";
+        std::cerr << "Usage: mbm-cgal-remesh input.obj output.obj edge-length-fraction [iterations [feature-angle-deg [report-path]]] [--target-triangles count] [--repair-topology] [--preserve-topology]\n";
         return 2;
     }
     std::ofstream reportFile;
@@ -256,13 +256,15 @@ int main(int argc, char **argv)
             std::filesystem::path(argv[2]).extension() != ".obj")
             throw std::runtime_error("input and output must be .obj files");
         std::size_t targetTriangles = 0;
-        bool repairTopology = false;
+        bool repairTopology = false, preserveTopology = false;
         // Optional flags follow the complete positional block (including report).
         for (int i = 7; i < argc; ++i)
         {
             const std::string option = argv[i];
             if (option == "--repair-topology" && !repairTopology)
                 repairTopology = true;
+            else if (option == "--preserve-topology" && !preserveTopology)
+                preserveTopology = true;
             else if (option == "--target-triangles" && !targetTriangles && i + 1 < argc)
             {
                 const double target = number(argv[++i]);
@@ -273,19 +275,19 @@ int main(int argc, char **argv)
             else throw std::runtime_error("unknown, duplicate or incomplete option: " + option);
         }
         const double fraction = number(argv[3]);
-        const double rawIterations = argc >= 5 ? number(argv[4]) : 3;
-        if (!std::isfinite(rawIterations) || rawIterations < 1 || rawIterations > 10 ||
+        const double rawIterations = argc >= 5 ? number(argv[4]) : 10;
+        if (!std::isfinite(rawIterations) || rawIterations < 1 || rawIterations > 50 ||
             std::floor(rawIterations) != rawIterations)
-            throw std::runtime_error("iterations range: 1..10");
+            throw std::runtime_error("iterations range: 1..50");
         const unsigned iterations = static_cast<unsigned>(rawIterations);
-        const double featureAngle = argc >= 6 ? number(argv[5]) : 45.0;
+        const double featureAngle = argc >= 6 ? number(argv[5]) : 14.5;
         if (!std::isfinite(fraction) || fraction <= 0 || fraction > 0.25)
             throw std::runtime_error("edge-length fraction range: (0..0.25]");
         if (!std::isfinite(featureAngle) || featureAngle < 0 || featureAngle > 180)
             throw std::runtime_error("feature angle range: 0..180");
 
         MESH source;
-        auto input = mbm_cgal_uv::read(argv[1], source, repairTopology);
+        auto input = mbm_cgal_uv::read(argv[1], source, repairTopology, !preserveTopology);
         mbm_cgal_uv::REPAIR_REPORT repairReport;
         if (repairTopology) repairReport = mbm_cgal_uv::repair(input, source);
         if (source.number_of_faces() == 0 || !CGAL::is_triangle_mesh(source) || !CGAL::is_valid_polygon_mesh(source))

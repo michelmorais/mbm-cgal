@@ -2,7 +2,8 @@
 
 Uses CGAL plane region growing, corner detection and
 `remesh_almost_planar_patches` to reduce a triangle mesh. Input must be manifold
-after exact-position welding; there is no automatic repair or approximate welding.
+after exact-position welding by default; optional topology preparation is explicit.
+There is no approximate welding.
 
 ```sh
 mbm-cgal-planar input.obj output.obj 5 0.01 0.000001 report.txt
@@ -52,3 +53,21 @@ Tests cover planar coverage and holes, input/overwrite protection, UV interpolat
 seams, material boundaries, mirrored and tiled UVs, non-affine detail, curved and
 vertical surfaces, invalid input and the editor report protocol. Run from the
 repository root with `ctest --test-dir build --output-on-failure`.
+
+## Optional topology preparation
+
+```sh
+mbm-cgal-planar source.obj result.obj 10 .05 .000001 report.txt --repair-topology
+```
+
+`--repair-topology` uses the shared preparation routine: orient triangles and
+split non-manifold connections while preserving positions and corner UVs/materials.
+It does not remove degenerates or self-intersections. Reports include
+`repair_enabled`, `repair_split_vertices` and `repair_reversed_faces`.
+Topology metrics refer to the prepared source. Without the flag, input remains
+strict. Both flags below require OBJ and all six positional arguments.
+
+To consume the separate `mbm-cgal-repair` output, use `--preserve-topology`
+instead of welding its separate vertex indices back together. This flag does not
+skip mesh validation. Repair solves input topology, not UV/patch restrictions:
+a valid run may leave the triangle count unchanged.

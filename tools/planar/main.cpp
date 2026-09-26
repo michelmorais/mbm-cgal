@@ -34,6 +34,7 @@
 #include <string>
 #include <vector>
 #include "uv-transfer.h"
+#include "../common/repair-input.h"
 
 namespace PMP = CGAL::Polygon_mesh_processing;
 using KERNEL = CGAL::Exact_predicates_inexact_constructions_kernel;
@@ -70,16 +71,16 @@ static std::size_t components(MESH &mesh)
 
 int main(int argc, char **argv)
 {
-    if (argc != 5 && argc != 6 && argc != 7)
+    if (argc < 5 || argc > 9)
     {
-        std::cerr << "Usage: mbm-cgal-planar input.off|obj output.off|obj angle-deg distance-fraction [uv-epsilon [report-path]]\n";
+        std::cerr << "Usage: mbm-cgal-planar input.off|obj output.off|obj angle-deg distance-fraction [uv-epsilon [report-path]] [--repair-topology] [--preserve-topology]\n";
         return 2;
     }
     std::ofstream reportFile;
     try
     {
-        if (argc==7 && std::filesystem::exists(argv[6])) throw std::runtime_error("report already exists");
-        if (argc==7)
+        if (argc>=7 && std::filesystem::exists(argv[6])) throw std::runtime_error("report already exists");
+        if (argc>=7)
         {
             reportFile.open(argv[6]);
             if (!reportFile) throw std::runtime_error("cannot open report");
@@ -104,9 +105,22 @@ int main(int argc, char **argv)
         const double uvEpsilon=argc>=6 ? number(argv[5]) : 1e-6;
         if (!std::isfinite(uvEpsilon) || uvEpsilon<0 || uvEpsilon>0.01)
             throw std::runtime_error("UV epsilon range: 0..0.01 UV units");
+        bool repairTopology = false, preserveTopology = false;
+        for (int i = 7; i < argc; ++i)
+        {
+            const std::string option = argv[i];
+            if (option == "--repair-topology" && !repairTopology) repairTopology = true;
+            else if (option == "--preserve-topology" && !preserveTopology) preserveTopology = true;
+            else throw std::runtime_error("unknown or duplicate option: " + option);
+        }
         MESH source;
         mbm_cgal_uv::INPUT uvInput;
-        if (withUv) uvInput=mbm_cgal_uv::read(argv[1], source);
+        mbm_cgal_uv::REPAIR_REPORT repairReport;
+        if (withUv)
+        {
+            uvInput=mbm_cgal_uv::read(argv[1], source, repairTopology, !preserveTopology);
+            if (repairTopology) repairReport=mbm_cgal_uv::repair(uvInput, source);
+        }
         else if (!CGAL::IO::read_polygon_mesh(argv[1], source)) throw std::runtime_error("cannot read OFF mesh");
         if (source.is_empty() ||
             !CGAL::is_triangle_mesh(source) || !CGAL::is_valid_polygon_mesh(source))
@@ -159,6 +173,9 @@ int main(int argc, char **argv)
         std::ostringstream report;
         report.precision(17);
         report << "CGAL_RESULT source_vertices=" << num_vertices(source) << " source_triangles=" << num_faces(source)
+                  << " repair_enabled=" << repairTopology
+                  << " repair_split_vertices=" << repairReport.splitVertices
+                  << " repair_reversed_faces=" << repairReport.reversedFaces
                   << " result_vertices=" << num_vertices(result) << " result_triangles=" << num_faces(result)
                   << " geometric_regions=" << geometricRegionCount << " regions=" << regionCount
                   << " uv_enabled=" << withUv << " uv_seam_edges=" << uvCharts.seamEdges
@@ -170,7 +187,7 @@ int main(int argc, char **argv)
                   << " sampled_error_fraction=" << sampledError / diagonal
                   << " seconds=" << std::chrono::duration<double>(std::chrono::steady_clock::now()-begin).count() << '\n';
         std::cout << report.str();
-        if (argc==7)
+        if (argc>=7)
         {
             if (!(reportFile << report.str())) throw std::runtime_error("cannot write report");
         }

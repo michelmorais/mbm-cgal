@@ -135,12 +135,18 @@ variant; this does not submit or replace its paid remote Remesh task.
 Engine/editor integration tests live in the mini-mbm repository; this repository
 contains standalone geometry, UV and protocol tests.
 
+## Standalone topology repair
+
+`mbm-cgal-repair` repairs triangle connectivity and orientation without remeshing.
+See [repair usage and limitations](tools/repair/README.md). CGAL planar and Remesh
+also accept `--repair-topology` using the same preparation routine.
+
 ## Future work
 
 The following are proposals, not implemented tools or engine features:
 
 - **General mesh repair:** build on the read-only Audit diagnostics as a later,
-  standalone operation. Remesh already offers opt-in topology orientation and
+  broader operation. The repair tool, planar and Remesh already offer topology orientation and
   non-manifold splitting via `--repair-topology`; hole filling and intersection
   removal remain outside that limited preparation step.
 - **Collision proxies:** evaluate offline convex-hull or convex-decomposition
