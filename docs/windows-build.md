@@ -103,6 +103,13 @@ install-win/bin/
 install-win/share/mbm-cgal/
 ```
 
+On Windows, the project install rules also copy the required third-party DLL
+next to the executables. With the current vcpkg/MSVC configuration this is
+`gmp-10.dll`. CGAL, Eigen3 and most of Boost do not appear as separate runtime
+files in this build because they are header-only or statically linked.
+The MSVC runtime (`MSVCP140.dll`, `VCRUNTIME140.dll` and the Windows CRT) is
+provided by the Visual C++ Redistributable installed on the target machine.
+
 The executables in the build tree are normally located at:
 
 ```text
