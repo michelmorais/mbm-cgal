@@ -11,6 +11,8 @@ linked into the mini-mbm engine.
 - [mbm-cgal-remesh](tools/remesh/README.md): isotropic remeshing of static
   triangular OBJ meshes, with UV/material chart and sharp-feature constraints.
 
+- [mbm-cgal-repair](tools/repair/README.md): topology orientation and manifold splitting,
+  preserving positions and triangle count.
 - [mbm-cgal-audit](tools/audit/README.md): read-only OBJ/OFF geometry diagnostics
   with a versioned JSON API, also exposed through Lua and the three editors.
 
@@ -80,7 +82,8 @@ cmake -S . -B build-win `
   -DCMAKE_TOOLCHAIN_FILE=C:/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake `
   -DMBM_CGAL_BUILD_PLANAR=OFF `
   -DMBM_CGAL_BUILD_REMESH=OFF `
-  -DMBM_CGAL_BUILD_AUDIT=ON
+  -DMBM_CGAL_BUILD_AUDIT=ON `
+  -DMBM_CGAL_BUILD_REPAIR=OFF
 
 cmake --build build-win --config Release
 ctest --test-dir build-win -C Release --output-on-failure
@@ -92,7 +95,11 @@ After the audit worker passes, configure and build all workers:
 cmake -S . -B build-win `
   -G "Visual Studio 17 2022" `
   -A x64 `
-  -DCMAKE_TOOLCHAIN_FILE=C:/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake
+  -DCMAKE_TOOLCHAIN_FILE=C:/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake `
+  -DMBM_CGAL_BUILD_PLANAR=ON `
+  -DMBM_CGAL_BUILD_REMESH=ON `
+  -DMBM_CGAL_BUILD_AUDIT=ON `
+  -DMBM_CGAL_BUILD_REPAIR=ON
 
 cmake --build build-win --config Release
 ctest --test-dir build-win -C Release --output-on-failure
@@ -114,10 +121,14 @@ Installed executables are placed in `install/bin/`; licenses are installed under
 
 ## Use from mini-mbm
 
-In Mesh Debug or Image Mesh Editor, configure the full paths to
-`mbm-cgal-planar`, `mbm-cgal-remesh` and `mbm-cgal-audit` (or their `.exe` files) under
-**Options > CGAL executable** and save them. Their locations can change without
-rebuilding the engine.
+In Mesh Debug, Image Mesh or Mesh3DGen, select the installed **folder** under
+**Options > CGAL executable**. The shared table discovers `mbm-cgal-planar`,
+`mbm-cgal-remesh`, `mbm-cgal-repair` and `mbm-cgal-audit` (with `.exe` on Windows),
+shows a description and marks files found in green. **Refresh** rescans after
+installing tools. Green means file presence, not successful execution or DLL validation.
+The folder preference is `.mini-mbm-cgal-folder` in APPDATA/HOME, overridden by
+`MBM_CGAL_FOLDER_CONFIG`; it takes priority over legacy individual paths.
+Restart another open editor after changing the preference elsewhere.
 
 The mini-mbm editors expose planar reduction as `cgal`; `cgal_qem` can follow
 that pass with the engine's QEM when needed to meet a triangle budget. Isotropic
@@ -127,6 +138,12 @@ engine. The editors retain preview, cancellation, attribute transfer and
 undo/history responsibilities. The CLI OBJ format has no physics data; editor
 adapters copy authored collision shapes when rebuilding the MSH. Remesh requires
 static triangle meshes and does not transfer skin weights or animation.
+
+The editors expose edge length, iterations (10 by default, range 1..50) and
+feature angle (14.5 by default). They do not expose a triangle-count target.
+The CLI's optional `--target-triangles` heuristic remains available to direct
+integrations and does not guarantee a count. Remesh prioritizes triangulation
+regularity and can increase or decrease triangle count.
 
 The Image Mesh Editor can run Remesh after optional simplification as a separate
 stage. The mesh3dgen editor also uses the standalone worker for a local MSH
@@ -140,15 +157,35 @@ contains standalone geometry, UV and protocol tests.
 `mbm-cgal-repair` repairs triangle connectivity and orientation without remeshing.
 See [repair usage and limitations](tools/repair/README.md). CGAL planar and Remesh
 also accept `--repair-topology` using the same preparation routine.
+The editors run the separate repair executable before processing when requested,
+and preserve source indices both in OBJ export and with `--preserve-topology`
+on every repair/planar/remesh invocation. Without that CLI flag, exact-position
+welding can undo previously separated indices. Audit still welds exact positions,
+so its connectivity metrics can differ from indexed repair/processing.
+
+**Repair now** is independent of the preprocessing checkbox. A zero-split,
+zero-reversal result is a no-op: Mesh Debug does not dirty the source or replace
+undo; Mesh3DGen records an unchanged run without creating another variant.
+Changed Mesh3DGen repairs create a separate MSH variant. Hole filling and
+self-intersection removal are not provided.
+
+OBJ workers do not transfer authored normals. Repair adapters carry normals by
+source-face/corner correspondence. Remesh adapters reconstruct area-weighted
+normals within connected fans using the feature-angle threshold, preserving
+existing seams and sharp edges. Vertex budgets apply after this reconstruction.
 
 ## Future work
 
-The following are proposals, not implemented tools or engine features:
+The following are proposed extensions or new tools; these capabilities are not
+implemented yet:
 
-- **General mesh repair:** build on the read-only Audit diagnostics as a later,
-  broader operation. The repair tool, planar and Remesh already offer topology orientation and
-  non-manifold splitting via `--repair-topology`; hole filling and intersection
-  removal remain outside that limited preparation step.
+- **Extend the existing mesh repair tool:** add hole filling and treatment of
+  self-intersections to `mbm-cgal-repair`, guided by Audit diagnostics. The
+  [existing repair tool](tools/repair/README.md) already corrects face orientation
+  and splits non-manifold connections while preserving positions and triangle
+  count. Planar and Remesh can run the same topology preparation through
+  `--repair-topology`. Hole filling, self-intersection removal and removal of
+  degenerate faces remain outside the implemented repair scope.
 - **Collision proxies:** evaluate offline convex-hull or convex-decomposition
   generation for Bullet, with editor preview and an asset-format path. The
   expected benefit is cheaper collision geometry; prioritize this if 3D mesh

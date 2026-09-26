@@ -1,3 +1,8 @@
+> Historical validation record: counts and editor behavior below describe the
+> original integration. Current controls and topology/normal handling are in the
+> root README and tools/remesh/README.md. Windows validation is explicitly scoped
+> in windows-build.md; this record does not establish current Windows support.
+
 # Remesh validation — 2026-09-25
 
 The pending implementation was reviewed across mbm-cgal, mini-mbm and mesh3dgen.

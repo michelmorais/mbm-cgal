@@ -1,10 +1,11 @@
 # Windows build guide
 
-This project produces three standalone command-line workers:
+This project produces four standalone command-line workers:
 
 - `mbm-cgal-audit.exe`
 - `mbm-cgal-planar.exe`
 - `mbm-cgal-remesh.exe`
+- `mbm-cgal-repair.exe`
 
 They are built with CMake and MSVC. CGAL is not linked into the mini-mbm
 engine.
@@ -72,7 +73,8 @@ cmake -S . -B build-win `
   -DCMAKE_TOOLCHAIN_FILE=C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake `
   -DMBM_CGAL_BUILD_PLANAR=OFF `
   -DMBM_CGAL_BUILD_REMESH=OFF `
-  -DMBM_CGAL_BUILD_AUDIT=ON
+  -DMBM_CGAL_BUILD_AUDIT=ON `
+  -DMBM_CGAL_BUILD_REPAIR=OFF
 
 cmake --build build-win --config Release
 ctest --test-dir build-win -C Release --output-on-failure
@@ -83,13 +85,18 @@ runner with the smallest target set.
 
 ## Build all workers
 
-Once the audit worker succeeds, enable all targets:
+Once the audit worker succeeds, explicitly enable all four targets. CMake keeps
+previous OFF values in its cache; omitting these options does not re-enable them:
 
 ```powershell
 cmake -S . -B build-win `
   -G "Visual Studio 17 2022" `
   -A x64 `
-  -DCMAKE_TOOLCHAIN_FILE=C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake
+  -DCMAKE_TOOLCHAIN_FILE=C:/src/vcpkg/scripts/buildsystems/vcpkg.cmake `
+  -DMBM_CGAL_BUILD_PLANAR=ON `
+  -DMBM_CGAL_BUILD_REMESH=ON `
+  -DMBM_CGAL_BUILD_AUDIT=ON `
+  -DMBM_CGAL_BUILD_REPAIR=ON
 
 cmake --build build-win --config Release
 ctest --test-dir build-win -C Release --output-on-failure
@@ -103,10 +110,15 @@ install-win/bin/
 install-win/share/mbm-cgal/
 ```
 
-On Windows, the project install rules also copy the required third-party DLL
-next to the executables. With the current vcpkg/MSVC configuration this is
-`gmp-10.dll`. CGAL, Eigen3 and most of Boost do not appear as separate runtime
-files in this build because they are header-only or statically linked.
+On Windows, the install rules look for `gmp-10.dll` and `mpfr-6.dll` in the
+selected vcpkg triplet (or dependency prefixes) and copy those found next to the
+executables. Debug uses `debug/bin`; Release/RelWithDebInfo/MinSizeRel use `bin`.
+Which DLLs are needed depends on the CGAL configuration and linkage; static
+triplets may need neither. This is not recursive deployment of every dependency.
+Use `dumpbin /DEPENDENTS install-win\bin\mbm-cgal-repair.exe` (and the other
+workers) from the developer prompt, and verify the installed executables run
+without relying on build-tree DLLs. If dependency versions use other DLL names,
+collect the matching runtime files and update the install rule as appropriate.
 The MSVC runtime (`MSVCP140.dll`, `VCRUNTIME140.dll` and the Windows CRT) is
 provided by the Visual C++ Redistributable installed on the target machine.
 
@@ -116,6 +128,7 @@ The executables in the build tree are normally located at:
 build-win/tools/audit/Release/mbm-cgal-audit.exe
 build-win/tools/planar/Release/mbm-cgal-planar.exe
 build-win/tools/remesh/Release/mbm-cgal-remesh.exe
+build-win/tools/repair/Release/mbm-cgal-repair.exe
 ```
 
 ## Troubleshooting
@@ -160,6 +173,18 @@ the repository's `THIRD_PARTY.md` records the relevant licensing scope.
 
 ## Integration with mini-mbm
 
-Configure the editor with the full paths to the installed `.exe` files. The
-paths are intentionally external to the engine, so changing the worker build
-does not require rebuilding mini-mbm.
+In Mesh Debug, Image Mesh or Mesh3DGen, choose `install-win/bin` in
+**Options > CGAL executable**. The table discovers all four `.exe` files and
+shows descriptions/availability. **Refresh** updates the cached list. A green
+entry confirms the file exists; it cannot guarantee the DLLs are present.
+Changing tools does not require rebuilding mini-mbm.
+
+## Validation scope
+
+The current Windows changes have been reviewed for target flags, `.exe` discovery,
+Release/Debug install paths and command syntax. A Linux CMake configure/install
+test with synthetic GMP/MPFR files exercised both Windows install-rule branches. The Linux environment used for
+this revision has no MSVC, Windows SDK, Wine or MinGW runtime; no native Windows
+build or execution is claimed. Run the commands above and all CTest cases on
+Windows before distributing Windows binaries. CTest checks the build-tree tools;
+repeat representative OBJ commands with the installed tools to verify DLL deployment.

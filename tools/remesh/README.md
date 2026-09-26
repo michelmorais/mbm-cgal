@@ -14,7 +14,9 @@ default `10`), sharp-feature angle in degrees (0..180, default `14.5`), and an
 optional new report path. Existing outputs and reports are refused.
 
 Without repair enabled, input must be an oriented manifold triangle mesh with a UV on every face
-corner. Exact-position welding builds geometric connectivity. Material changes,
+corner. By default exact-position welding builds geometric connectivity.
+`--preserve-topology` instead retains input OBJ vertex identities. The editor
+adapters export indexed connectivity and always pass that flag. Material changes,
 UV seams, open boundaries and detected sharp edges constrain the remesher and
 separate UV/material charts. Output UVs are interpolated from the closest point
 on the corresponding source chart. Normals are not transferred; clients should
@@ -70,12 +72,10 @@ Additional report fields: `target_triangles` (0 for length mode),
 `search_attempts`, and `surface_area`. Result counts use live vertices/faces,
 excluding removed Surface_mesh storage slots.
 
-All three editors expose a target checkbox and fixed-width integer field;
-length mode remains the default for existing projects. Reports show requested
-and achieved counts, the percentage difference, and a warning outside 5%.
-Mesh Debug distributes a selected-subset total proportionally to source triangle
-counts with at least two triangles per selected subset. Image Mesh applies the
-target per generated region; mesh3dgen applies it to the selected local asset.
+The editors expose edge-length mode only. Triangle-count mode remains a CLI
+heuristic for direct integrations; it is not a CGAL guarantee or a simplifier.
+Mesh3DGen's remote provider Remesh is a separate workflow and retains its own
+provider controls.
 
 ## Optional topology repair
 
@@ -103,3 +103,12 @@ its splits. Supply all six positional arguments before flags. Mesh validity
 checks still apply. GUI defaults enable repair and target count; CLI flags stay
 explicit. Ten passes are the default, up to fifty are accepted. More passes do
 not guarantee improved detail preservation or a reachable triangle target.
+
+## Editor normal reconstruction
+
+The worker does not export normals. Current mini-mbm and Mesh3DGen adapters
+reconstruct area-weighted normals across consistently oriented adjacent faces
+within the feature-angle threshold. They keep material/UV seams, existing index
+splits and sharp edges separate. This avoids expanding every smooth triangle
+into three render vertices. The 65,535 render-vertex budget remains checked after
+import; it differs from the geometric vertex count in this tool's report.

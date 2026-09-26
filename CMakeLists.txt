@@ -20,20 +20,33 @@ if(MBM_CGAL_BUILD_REPAIR)
     add_subdirectory(tools/repair)
 endif()
 if(WIN32)
-    # vcpkg's MSBuild integration copies this runtime DLL beside the build
-    # executable, but CMake's install rules do not know about that copy step.
-    # Install only this third-party DLL; Windows system and MSVC runtime DLLs
-    # must be provided by the target machine or the Visual C++ Redistributable.
-    find_file(MBM_CGAL_GMP_DLL
-        NAMES gmp-10.dll
-        PATHS
-            "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}"
-            ${CMAKE_PREFIX_PATH}
-        PATH_SUFFIXES bin
-        NO_DEFAULT_PATH)
-    if(MBM_CGAL_GMP_DLL)
-        install(FILES "${MBM_CGAL_GMP_DLL}" DESTINATION bin)
-    endif()
+    # Copy the arithmetic runtimes when dynamically linked through vcpkg.
+    # This intentionally excludes Windows/MSVC system runtimes.
+    foreach(runtime IN ITEMS GMP MPFR)
+        if(runtime STREQUAL "GMP")
+            set(runtime_name gmp-10.dll)
+        else()
+            set(runtime_name mpfr-6.dll)
+        endif()
+        foreach(configuration IN ITEMS RELEASE DEBUG)
+            if(configuration STREQUAL "DEBUG")
+                set(runtime_suffix debug/bin)
+                set(install_configurations Debug)
+            else()
+                set(runtime_suffix bin)
+                set(install_configurations Release RelWithDebInfo MinSizeRel)
+            endif()
+            find_file(MBM_CGAL_${runtime}_${configuration}_DLL
+                NAMES ${runtime_name}
+                PATHS "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}" ${CMAKE_PREFIX_PATH}
+                PATH_SUFFIXES ${runtime_suffix}
+                NO_DEFAULT_PATH)
+            if(MBM_CGAL_${runtime}_${configuration}_DLL)
+                install(FILES "${MBM_CGAL_${runtime}_${configuration}_DLL}"
+                    DESTINATION bin CONFIGURATIONS ${install_configurations})
+            endif()
+        endforeach()
+    endforeach()
 endif()
 install(FILES LICENSE NOTICE.md THIRD_PARTY.md DESTINATION share/mbm-cgal)
 install(DIRECTORY LICENSES DESTINATION share/mbm-cgal)
