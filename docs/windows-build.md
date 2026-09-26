@@ -132,6 +132,12 @@ Remove-Item -Recurse -Force build-win
 Use a narrowly scoped build directory such as `build-win`; do not remove the
 repository or the vcpkg installation.
 
+If CMake reports that Eigen3 version `5.0.1` is incompatible with the requested
+version `3.1`, use the current repository version. Its CMake files intentionally
+do not request a specific Eigen major version because Eigen's package config can
+reject an older requested major even when the required `Eigen3::Eigen` target is
+available.
+
 ### Tests cannot start Python
 
 Install Python 3 and ensure `python` or the Python launcher is available on

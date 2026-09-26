@@ -17,7 +17,10 @@ cmake_minimum_required(VERSION 3.25.1)
 project(mbm_cgal_planar LANGUAGES CXX)
 # Intentionally separate from the engine build; CGAL PMP has GPL/commercial terms.
 find_package(CGAL 6.0 REQUIRED)
-find_package(Eigen3 3.1 REQUIRED NO_MODULE)
+# Do not pass 3.1 here: modern Eigen CMake packages may report a newer major
+# version (for example 5.x) and reject an older requested major as incompatible
+# even though the package provides the Eigen3::Eigen target.
+find_package(Eigen3 REQUIRED NO_MODULE)
 add_executable(mbm-cgal-planar main.cpp)
 target_compile_features(mbm-cgal-planar PRIVATE cxx_std_17)
 target_link_libraries(mbm-cgal-planar PRIVATE CGAL::CGAL Eigen3::Eigen)
