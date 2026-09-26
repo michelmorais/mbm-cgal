@@ -109,6 +109,51 @@ def main():
                     assert x >= .5 - 1e-9 if offset else x <= .5 + 1e-9
         assert materials == {"surface", "right"}
 
+        # Optional repair preserves corner UVs when reversing winding, and
+        # splits non-manifold edges without dropping faces or moving points.
+        make_grid(source, charts=True)
+        lines = source.read_text().splitlines()
+        first_face = next(i for i, line in enumerate(lines) if line.startswith('f '))
+        corners = lines[first_face].split()[1:]
+        lines[first_face] = 'f ' + ' '.join(reversed(corners))
+        fixtures = {
+            'winding': '\n'.join(lines) + '\n',
+            'nonmanifold': 'v 0 0 0\nv 1 0 0\nv 0 1 0\nv 0 -1 0\nv 0 0 1\n'
+                'vt 0 0\nvt 1 0\nvt 0 1\nvt 0 -1\nvt 0 0\n'
+                'usemtl surface\nf 1/1 2/2 3/3\nf 2/2 1/1 4/4\n'
+                'usemtl branch\nf 1/1 2/2 5/5\n'
+        }
+        for name, content in fixtures.items():
+            repair_source = root / (name + '.obj')
+            repair_source.write_text(content)
+            before = repair_source.read_bytes()
+            rejected = root / (name + '-rejected.obj')
+            run = subprocess.run([str(executable), str(repair_source), str(rejected), '.1'], capture_output=True, text=True)
+            assert run.returncode == 1 and 'oriented manifold' in run.stderr and not rejected.exists(), run.stderr
+            repaired = root / (name + '-repaired.obj')
+            repair_report = root / (name + '-repair.txt')
+            run = subprocess.run([str(executable), str(repair_source), str(repaired), '.2', '1', '0',
+                                  str(repair_report), '--repair-topology'], capture_output=True, text=True)
+            assert run.returncode == 0, run.stderr
+            fields = dict(part.split('=') for part in repair_report.read_text().split()[1:])
+            assert fields['repair_enabled'] == '1'
+            assert int(fields['repair_reversed_faces' if name == 'winding' else 'repair_split_vertices']) > 0
+            assert repair_source.read_bytes() == before
+            vertices, uvs, material, seen = [], [], None, set()
+            for line in repaired.read_text().splitlines():
+                parts = line.split()
+                if not parts: continue
+                if parts[0] == 'v': vertices.append(tuple(map(float, parts[1:])))
+                elif parts[0] == 'vt': uvs.append(tuple(map(float, parts[1:])))
+                elif parts[0] == 'usemtl': material = parts[1]; seen.add(material)
+                elif parts[0] == 'f':
+                    for corner in parts[1:]:
+                        vi, ti = map(int, corner.split('/'))
+                        x, y, z = vertices[vi-1]; u, v = uvs[ti-1]
+                        offset = 10 if material == 'right' else 0
+                        assert abs(u-x-offset) < 1e-9 and abs(v-y) < 1e-9, (name, material, x, y, u, v)
+            assert seen == ({'surface','right'} if name == 'winding' else {'surface','branch'})
+
         # Existing outputs must remain untouched even on failure.
         original = refined.read_bytes()
         run = subprocess.run([str(executable), str(source), str(refined), "0.1"], capture_output=True)

@@ -38,6 +38,7 @@
 #include <vector>
 #include "../planar/uv-transfer.h"
 #include "../common/mesh-audit.h"
+#include "repair-input.h"
 
 namespace PMP = CGAL::Polygon_mesh_processing;
 using KERNEL = CGAL::Exact_predicates_inexact_constructions_kernel;
@@ -230,9 +231,9 @@ static void writeObj(const std::string &path, const MESH &mesh,
 
 int main(int argc, char **argv)
 {
-    if (argc < 4 || (argc > 7 && argc != 9))
+    if (argc < 4)
     {
-        std::cerr << "Usage: mbm-cgal-remesh input.obj output.obj edge-length-fraction [iterations [feature-angle-deg [report-path]]] [--target-triangles count]\n";
+        std::cerr << "Usage: mbm-cgal-remesh input.obj output.obj edge-length-fraction [iterations [feature-angle-deg [report-path]]] [--target-triangles count] [--repair-topology]\n";
         return 2;
     }
     std::ofstream reportFile;
@@ -255,13 +256,21 @@ int main(int argc, char **argv)
             std::filesystem::path(argv[2]).extension() != ".obj")
             throw std::runtime_error("input and output must be .obj files");
         std::size_t targetTriangles = 0;
-        if (argc == 9)
+        bool repairTopology = false;
+        // Optional flags follow the complete positional block (including report).
+        for (int i = 7; i < argc; ++i)
         {
-            const double target = number(argv[8]);
-            if (std::string(argv[7]) != "--target-triangles" || !std::isfinite(target) ||
-                target < 2 || target > 100000 || std::floor(target) != target)
-                throw std::runtime_error("target triangles range: integer 2..100000");
-            targetTriangles = static_cast<std::size_t>(target);
+            const std::string option = argv[i];
+            if (option == "--repair-topology" && !repairTopology)
+                repairTopology = true;
+            else if (option == "--target-triangles" && !targetTriangles && i + 1 < argc)
+            {
+                const double target = number(argv[++i]);
+                if (!std::isfinite(target) || target < 2 || target > 100000 || std::floor(target) != target)
+                    throw std::runtime_error("target triangles range: integer 2..100000");
+                targetTriangles = static_cast<std::size_t>(target);
+            }
+            else throw std::runtime_error("unknown, duplicate or incomplete option: " + option);
         }
         const double fraction = number(argv[3]);
         const double rawIterations = argc >= 5 ? number(argv[4]) : 3;
@@ -276,7 +285,9 @@ int main(int argc, char **argv)
             throw std::runtime_error("feature angle range: 0..180");
 
         MESH source;
-        const auto input = mbm_cgal_uv::read(argv[1], source);
+        auto input = mbm_cgal_uv::read(argv[1], source, repairTopology);
+        mbm_cgal_uv::REPAIR_REPORT repairReport;
+        if (repairTopology) repairReport = mbm_cgal_uv::repair(input, source);
         if (source.number_of_faces() == 0 || !CGAL::is_triangle_mesh(source) || !CGAL::is_valid_polygon_mesh(source))
             throw std::runtime_error("input is not a valid manifold triangle mesh; no automatic repair performed");
         for (const auto &face : input.faces)
@@ -380,6 +391,9 @@ int main(int argc, char **argv)
         report << std::setprecision(17)
                << "CGAL_REMESH_RESULT source_vertices=" << num_vertices(source)
                << " source_triangles=" << num_faces(source)
+               << " repair_enabled=" << repairTopology
+               << " repair_split_vertices=" << repairReport.splitVertices
+               << " repair_reversed_faces=" << repairReport.reversedFaces
                << " result_vertices=" << result.number_of_vertices()
                << " result_triangles=" << result.number_of_faces()
                << " target_edge_length=" << targetEdgeLength

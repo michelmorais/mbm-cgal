@@ -13,7 +13,7 @@ input bounding-box diagonal (greater than 0 and at most 0.25), iterations (1..10
 default `3`), sharp-feature angle in degrees (0..180, default `45`), and an
 optional new report path. Existing outputs and reports are refused.
 
-The input must be an oriented manifold triangle mesh with a UV on every face
+Without repair enabled, input must be an oriented manifold triangle mesh with a UV on every face
 corner. Exact-position welding builds geometric connectivity. Material changes,
 UV seams, open boundaries and detected sharp edges constrain the remesher and
 separate UV/material charts. Output UVs are interpolated from the closest point
@@ -21,7 +21,8 @@ on the corresponding source chart. Normals are not transferred; clients should
 recompute shading normals. MTL references are retained; MTL files and textures
 are not copied.
 
-The worker rejects invalid/non-manifold input and does not repair it. The report
+By default the worker rejects invalid/non-manifold input. Optional topology
+repair is described below. The report
 contains source/result counts, target edge length, chart count, topology checks,
 sampled bidirectional deviation and duration. The deviation is sampled, not a
 certified Hausdorff bound. Exit code `3` means the result introduces
@@ -75,3 +76,23 @@ and achieved counts, the percentage difference, and a warning outside 5%.
 Mesh Debug distributes a selected-subset total proportionally to source triangle
 counts with at least two triangles per selected subset. Image Mesh applies the
 target per generated region; mesh3dgen applies it to the selected local asset.
+
+## Optional topology repair
+
+```sh
+mbm-cgal-remesh input.obj output.obj 0.03 3 45 report.txt --target-triangles 20000 --repair-topology
+```
+
+`--repair-topology` is opt-in and requires all six positional arguments. It can
+also be used without `--target-triangles`. Before remeshing, CGAL orients the
+triangle soup and duplicates vertices to split non-manifold connections. No
+source triangles are removed and no source positions are moved during repair;
+corner UVs and materials follow the repaired faces. Degenerate faces remain an
+error. This does not fill holes or remove self-intersections. Repair may open
+seams or separate components, and existing self-intersections may remain.
+
+`repair_enabled`, `repair_split_vertices` and `repair_reversed_faces` are numeric
+result fields. Source topology metrics and all subsequent topology comparisons
+refer to the **repaired** source, not the original invalid soup. Output vertex
+indices encode the splits: consumers must not weld coincident output vertices
+back together when importing. The planar worker retains its strict input policy.

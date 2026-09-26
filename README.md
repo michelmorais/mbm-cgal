@@ -87,8 +87,10 @@ contains standalone geometry, UV and protocol tests.
 
 The following are proposals, not implemented tools or engine features:
 
-- **Mesh repair:** build on the read-only Audit diagnostics as a later, explicit
-  operation that writes a separate result.
+- **General mesh repair:** build on the read-only Audit diagnostics as a later,
+  standalone operation. Remesh already offers opt-in topology orientation and
+  non-manifold splitting via `--repair-topology`; hole filling and intersection
+  removal remain outside that limited preparation step.
 - **Collision proxies:** evaluate offline convex-hull or convex-decomposition
   generation for Bullet, with editor preview and an asset-format path. The
   expected benefit is cheaper collision geometry; prioritize this if 3D mesh

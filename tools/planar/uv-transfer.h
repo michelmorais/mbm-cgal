@@ -64,7 +64,7 @@ inline std::size_t index(const std::string &token, std::size_t count)
         throw std::runtime_error("OBJ index out of range");
     return static_cast<std::size_t>(resolved);
 }
-inline INPUT read(const std::string &path, MESH &mesh)
+inline INPUT read(const std::string &path, MESH &mesh, bool deferFaces = false)
 {
     std::ifstream file(path);
     if (!file) throw std::runtime_error("cannot open OBJ");
@@ -125,9 +125,12 @@ inline INPUT read(const std::string &path, MESH &mesh)
             }
             std::string extra;
             if (stream >> extra) throw std::runtime_error("OBJ requires triangular faces");
-            const auto f = mesh.add_face(face.vertices[0], face.vertices[1], face.vertices[2]);
-            if (f == MESH::null_face()) throw std::runtime_error("OBJ is not an oriented manifold after exact-position welding");
-            if (f.idx() != input.faces.size()) throw std::runtime_error("unexpected face indexing");
+            if (!deferFaces)
+            {
+                const auto f = mesh.add_face(face.vertices[0], face.vertices[1], face.vertices[2]);
+                if (f == MESH::null_face()) throw std::runtime_error("OBJ is not an oriented manifold after exact-position welding");
+                if (f.idx() != input.faces.size()) throw std::runtime_error("unexpected face indexing");
+            }
             input.faces.push_back(face);
         }
         else if (tag != "o" && tag != "g" && tag != "s")
